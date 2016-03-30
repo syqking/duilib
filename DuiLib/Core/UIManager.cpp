@@ -117,6 +117,7 @@ m_bMouseTracking(false),
 m_bMouseCapture(false),
 m_bIsPainting(false),
 m_bOffscreenPaint(true),
+m_bAlphaBackground(false),
 m_bUsedVirtualWnd(false),
 m_bAsyncNotifyPosted(false),
 m_bForceUseSharedRes(false),
@@ -525,6 +526,11 @@ void CPaintManagerUI::SetMaxInfo(int cx, int cy)
     ASSERT(cx>=0 && cy>=0);
     m_szMaxWindow.cx = cx;
     m_szMaxWindow.cy = cy;
+}
+
+void CPaintManagerUI::SetBackgroundTransparent(bool bTrans)
+{
+    m_bAlphaBackground = bTrans;
 }
 
 bool CPaintManagerUI::IsShowUpdateRect() const
@@ -936,8 +942,27 @@ bool CPaintManagerUI::MessageHandler(UINT uMsg, WPARAM wParam, LPARAM lParam, LR
             if( m_bOffscreenPaint )
             {
                 HBITMAP hOldBitmap = (HBITMAP) ::SelectObject(m_hDcOffscreen, m_hbmpOffscreen);
-                int iSaveDC = ::SaveDC(m_hDcOffscreen);
-				if (m_bLayered && m_diLayered.pImageInfo == NULL) {
+                int iSaveDC = ::SaveDC(m_hDcOffscreen);                
+                
+                if (m_bAlphaBackground) {
+                    if (m_hbmpBackground == NULL) {
+                        RECT rcClient = { 0 };
+                        ::GetClientRect(m_hWndPaint, &rcClient);
+                        m_hDcBackground = ::CreateCompatibleDC(m_hDcPaint);;
+                        m_hbmpBackground = ::CreateCompatibleBitmap(m_hDcPaint, rcClient.right - rcClient.left, rcClient.bottom - rcClient.top);
+                        ASSERT(m_hDcBackground);
+                        ASSERT(m_hbmpBackground);
+                        ::SelectObject(m_hDcBackground, m_hbmpBackground);
+                        ::BitBlt(m_hDcBackground, ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right - ps.rcPaint.left,
+                            ps.rcPaint.bottom - ps.rcPaint.top, ps.hdc, ps.rcPaint.left, ps.rcPaint.top, SRCCOPY);
+                    }
+                    else
+                        ::SelectObject(m_hDcBackground, m_hbmpBackground);
+                    ::BitBlt(m_hDcOffscreen, ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right - ps.rcPaint.left,
+                        ps.rcPaint.bottom - ps.rcPaint.top, m_hDcBackground, ps.rcPaint.left, ps.rcPaint.top, SRCCOPY);
+                }
+
+                if (m_bLayered && m_diLayered.pImageInfo == NULL) {
 					COLORREF* pOffscreenBits = NULL;
 					for( LONG y = rcClient.bottom - rcPaint.bottom; y < rcClient.bottom - rcPaint.top; ++y ) {
 						for( LONG x = rcPaint.left; x < rcPaint.right; ++x ) {
@@ -1005,7 +1030,8 @@ bool CPaintManagerUI::MessageHandler(UINT uMsg, WPARAM wParam, LPARAM lParam, LR
 					BYTE R = 0;
 					BYTE G = 0;
 					BYTE B = 0;
-					if (m_diLayered.pImageInfo != NULL) {
+
+                    if (m_diLayered.pImageInfo != NULL) {
 						if( m_hbmpBackground == NULL) {
 							m_hDcBackground = ::CreateCompatibleDC(m_hDcPaint);
 							m_hbmpBackground = CRenderEngine::CreateARGB32Bitmap(m_hDcPaint, dwWidth, dwHeight, &m_pBackgroundBits); 
@@ -3099,9 +3125,12 @@ void CPaintManagerUI::SetWindowAttribute(LPCTSTR pstrName, LPCTSTR pstrValue)
     else if( _tcsicmp(pstrName, _T("opacity")) == 0 ) {
         SetOpacity(_ttoi(pstrValue));
     } 
+    else if (_tcsicmp(pstrName, _T("bktrans")) == 0) {
+        SetBackgroundTransparent(_tcscmp(pstrValue, _T("true")) == 0);
+    }
     else if( _tcscmp(pstrName, _T("layeredopacity")) == 0 ) {
         SetLayeredOpacity(_ttoi(pstrValue));
-    } 
+    }
     else if( _tcscmp(pstrName, _T("layeredimage")) == 0 ) {
         SetLayered(true);
         SetLayeredImage(pstrValue);

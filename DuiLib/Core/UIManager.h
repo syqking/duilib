@@ -224,6 +224,7 @@ public:
     void SetMinInfo(int cx, int cy);
     SIZE GetMaxInfo() const;
     void SetMaxInfo(int cx, int cy);
+    void SetBackgroundTransparent(bool bTrans);
     bool IsShowUpdateRect() const;
     void SetShowUpdateRect(bool show);
     bool IsNoActivate();
@@ -448,6 +449,7 @@ private:
     bool m_bUpdateNeeded;
     bool m_bFocusNeeded;
     bool m_bOffscreenPaint;
+    bool m_bAlphaBackground;
 
 	BYTE m_nOpacity;
 	bool m_bLayered;
